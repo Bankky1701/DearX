@@ -38,20 +38,31 @@ export const LaidonjoApp: React.FC = () => {
   const [viewMode, setViewMode] = useState<'lobby' | 'analyzer'>('lobby');
 
   const [activeRoomId, setActiveRoomId] = useState<number>(1);
-  const [roomSequences, setRoomSequences] = useState<Record<number, GameResult[]>>(() => {
-    if (typeof localStorage !== 'undefined') {
-      const saved = localStorage.getItem('laidonjo_room_sequences');
-      if (saved) {
-        try {
-          return JSON.parse(saved);
-        } catch {}
-      }
+  const [allSexyTables, setAllSexyTables] = useState<ApiLiveTable[]>(() => liveCasinoApi.getTablesSync());
+  const [syncedTable, setSyncedTable] = useState<SyncedTableInfo | null>(() => {
+    const initialList = liveCasinoApi.getTablesSync();
+    if (initialList && initialList.length > 0) {
+      const top = initialList[0];
+      return {
+        tableId: top.id,
+        tableName: top.tableName,
+        provider: 'Sexy Baccarat',
+        dealerName: top.dealerName,
+        dealerImage: top.dealerImage,
+        gameShoe: top.gameShoe,
+        status: top.status,
+        countdown: top.countdown,
+        autoSync: true,
+        openedCards: top.openedCards,
+      };
     }
-    return INITIAL_ROOM_SEQUENCES;
+    return null;
   });
-
-  const [syncedTable, setSyncedTable] = useState<SyncedTableInfo | null>(null);
-  const [allSexyTables, setAllSexyTables] = useState<ApiLiveTable[]>([]);
+  const [roomSequences, setRoomSequences] = useState<Record<number, GameResult[]>>(() => {
+    const initialList = liveCasinoApi.getTablesSync();
+    const initialCards = initialList[0]?.sequence || [];
+    return { 1: initialCards.length > 0 ? [...initialCards] : ['B', 'B', 'P', 'P', 'B'] };
+  });
   const [isSexyRadarOpen, setIsSexyRadarOpen] = useState(false);
   const [isScanModalOpen, setIsScanModalOpen] = useState(false);
   const [isAutopilot, setIsAutopilot] = useState(false);

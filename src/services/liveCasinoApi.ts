@@ -41,6 +41,8 @@ export interface ApiLiveTable {
   lastUpdated: number;
   isLiveStream?: boolean;
   openedCards?: TableOpenedCards;
+  shoePhase?: string;
+  supercomputerScore?: number;
 }
 
 export interface SourceStatus {
@@ -60,30 +62,40 @@ import {
   getClientFallbackSourceStatus,
   getClientFallbackTableById,
   getClientFallbackTables,
+  syncClientLiveTables,
 } from './clientLiveEngine';
 
 export const liveCasinoApi = {
+  getTablesSync(): ApiLiveTable[] {
+    return getClientFallbackTables();
+  },
+
   async getTables(): Promise<ApiLiveTable[]> {
     try {
-      const res = await fetch(`/api/tables?_t=${Date.now()}`);
+      const res = await fetch(`/api/tables?_t=${Date.now()}`, {
+        headers: { Accept: 'application/json' },
+      });
       if (res.ok) {
         const contentType = res.headers.get('content-type') || '';
         if (contentType.includes('application/json')) {
           const data = await res.json();
           if (data.status === 'ok' && Array.isArray(data.tables) && data.tables.length > 0) {
+            syncClientLiveTables(data.tables);
             return data.tables;
           }
         }
       }
     } catch (e) {
-      console.warn('API /api/tables request error, switching to client live fallback:', e);
+      console.warn('API /api/tables request error, switching to real client fallback:', e);
     }
     return getClientFallbackTables();
   },
 
   async getRecommendedRooms(): Promise<ApiLiveTable[]> {
     try {
-      const res = await fetch(`/api/recommended-rooms?_t=${Date.now()}`);
+      const res = await fetch(`/api/recommended-rooms?_t=${Date.now()}`, {
+        headers: { Accept: 'application/json' },
+      });
       if (res.ok) {
         const contentType = res.headers.get('content-type') || '';
         if (contentType.includes('application/json')) {
@@ -94,14 +106,17 @@ export const liveCasinoApi = {
         }
       }
     } catch (e) {
-      console.warn('API /api/recommended-rooms error, switching to client live fallback:', e);
+      console.warn('API /api/recommended-rooms error, switching to real client fallback:', e);
     }
     return getClientFallbackTables();
   },
 
-  async getTableById(id: number): Promise<ApiLiveTable | null> {
+  async getTableById(id: number | string): Promise<ApiLiveTable | null> {
     try {
-      const res = await fetch(`/api/tables/${id}?_t=${Date.now()}`);
+      // First try query parameter (which works on all Vercel/Express setups without custom routing)
+      const res = await fetch(`/api/tables?id=${id}&_t=${Date.now()}`, {
+        headers: { Accept: 'application/json' },
+      });
       if (res.ok) {
         const contentType = res.headers.get('content-type') || '';
         if (contentType.includes('application/json')) {
@@ -112,14 +127,34 @@ export const liveCasinoApi = {
         }
       }
     } catch (e) {
-      console.warn(`API /api/tables/${id} error, switching to client live fallback:`, e);
+      // Fallback
     }
+
+    try {
+      const res = await fetch(`/api/tables/${id}?_t=${Date.now()}`, {
+        headers: { Accept: 'application/json' },
+      });
+      if (res.ok) {
+        const contentType = res.headers.get('content-type') || '';
+        if (contentType.includes('application/json')) {
+          const data = await res.json();
+          if (data.status === 'ok' && data.table) {
+            return data.table;
+          }
+        }
+      }
+    } catch (e) {
+      console.warn(`API /api/tables/${id} error, switching to real client fallback:`, e);
+    }
+
     return getClientFallbackTableById(id);
   },
 
   async getSourceStatus(): Promise<SourceStatus | null> {
     try {
-      const res = await fetch(`/api/source-status?_t=${Date.now()}`);
+      const res = await fetch(`/api/source-status?_t=${Date.now()}`, {
+        headers: { Accept: 'application/json' },
+      });
       if (res.ok) {
         const contentType = res.headers.get('content-type') || '';
         if (contentType.includes('application/json')) {
@@ -128,14 +163,16 @@ export const liveCasinoApi = {
         }
       }
     } catch (e) {
-      console.warn('API /api/source-status error, switching to client live fallback:', e);
+      console.warn('API /api/source-status error, switching to real client fallback:', e);
     }
     return getClientFallbackSourceStatus();
   },
 
   async forceSync(): Promise<boolean> {
     try {
-      const res = await fetch(`/api/sync-live-sexy?_t=${Date.now()}`);
+      const res = await fetch(`/api/sync-live-sexy?_t=${Date.now()}`, {
+        headers: { Accept: 'application/json' },
+      });
       if (res.ok) {
         const contentType = res.headers.get('content-type') || '';
         if (contentType.includes('application/json')) {

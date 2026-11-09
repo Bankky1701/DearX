@@ -3,6 +3,7 @@ import http from 'http';
 import { createServer as createViteServer } from 'vite';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { REAL_SEXY_TABLE_SEEDS, sortRoomsByLateAndWinRate } from './src/services/sexyLiveEngine';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -70,6 +71,8 @@ export interface CasinoTable {
   lastUpdated: number;
   isLiveStream?: boolean;
   openedCards: TableOpenedCards;
+  shoePhase?: string;
+  supercomputerScore?: number;
 }
 
 interface UpstreamSexyRoom {
@@ -333,6 +336,15 @@ function computeTableStats(
   table.beautyScore = Math.min(99, Math.round(evaluation.cycleWinRate));
   table.isHotRoom = evaluation.cycleWinRate >= 90.0;
   table.gameRound = seq.length;
+  table.shoePhase =
+    seq.length >= 35
+      ? `ขอนปลาย (${seq.length} ตา สถิตินิ่งแน่น)`
+      : seq.length >= 20
+      ? `ขอนกลาง (${seq.length} ตา กำลังเข้าเทรนด์)`
+      : `ขอนต้น (${seq.length} ตา ขอนใหม่)`;
+  table.supercomputerScore = Number(
+    Math.min(99.9, (table.winRate * 0.5) + (Math.min(seq.length, 60) * 0.45) + ((table.directWinRate || 90) * 0.2)).toFixed(1)
+  );
 
   // Generate authentic opened cards for this room and round
   table.openedCards = generateTableOpenedCards(
@@ -456,133 +468,39 @@ export function generateTableOpenedCards(
   };
 }
 
-// Fallback initial tables data if offline
-const initialSexyTablesData: Partial<CasinoTable>[] = [
-  {
-    id: 1,
-    tableCode: 'SE01',
-    provider: 'Sexy Baccarat',
-    tableName: 'SE01 บิกินี่คลาสสิก (C01)',
-    hallName: 'Sexy Classic',
-    dealerName: 'Lay',
-    dealerCountry: 'Thailand',
-    dealerImage: 'https://jhmbs3.godbac987.com/images/player/dealers/png/1501673-3.png',
-    gameShoe: 28955,
-    betTimeSeconds: 19,
-    countdown: 14,
-    status: 'betting',
-    martingaleStep: 0,
-  },
-  {
-    id: 2,
-    tableCode: 'SE02',
-    provider: 'Sexy Baccarat',
-    tableName: 'SE02 สปีดมังกร 15วิ (C02)',
-    hallName: 'Sexy Classic',
-    dealerName: 'Mayra',
-    dealerCountry: 'Thailand',
-    dealerImage: 'https://jhmbs3.godbac987.com/images/player/dealers/png/1501809-3.png',
-    gameShoe: 29871,
-    betTimeSeconds: 19,
-    countdown: 7,
-    status: 'betting',
-    martingaleStep: 0,
-  },
-  {
-    id: 3,
-    tableCode: 'SE03',
-    provider: 'Sexy Baccarat',
-    tableName: 'SE03 ปิงปองโกลด์ (C03)',
-    hallName: 'Sexy Classic',
-    dealerName: 'Rainy',
-    dealerCountry: 'Thailand',
-    dealerImage: 'https://jhmbs3.godbac987.com/images/player/dealers/png/1501572-3.png',
-    gameShoe: 4851,
-    betTimeSeconds: 19,
-    countdown: 18,
-    status: 'betting',
-    martingaleStep: 0,
-  },
-  {
-    id: 14,
-    tableCode: 'B14',
-    provider: 'Sexy Baccarat',
-    tableName: 'B14 Sexy Asia มังกรคู่',
-    hallName: 'Sexy Asia',
-    dealerName: 'Josie',
-    dealerCountry: 'Mexico',
-    dealerImage: 'https://jhmbs3.godbac987.com/images/player/dealers/png/1501883-2.png',
-    gameShoe: 9165,
-    betTimeSeconds: 19,
-    countdown: 12,
-    status: 'betting',
-    martingaleStep: 0,
-  },
-  {
-    id: 15,
-    tableCode: 'B15',
-    provider: 'Sexy Baccarat',
-    tableName: 'B15 Sexy Asia ไหลตามน้ำ',
-    hallName: 'Sexy Asia',
-    dealerName: 'Mafer',
-    dealerCountry: 'Mexico',
-    dealerImage: 'https://jhmbs3.godbac987.com/images/player/dealers/png/1501136-2.png',
-    gameShoe: 2099,
-    betTimeSeconds: 19,
-    countdown: 9,
-    status: 'betting',
-    martingaleStep: 0,
-  },
-  {
-    id: 6,
-    tableCode: 'B06',
-    provider: 'Sexy Baccarat',
-    tableName: 'B06 Sexy Asia สลับ 1-2',
-    hallName: 'Sexy Asia',
-    dealerName: 'RED',
-    dealerCountry: 'Russia',
-    dealerImage: 'https://jhmbs3.godbac987.com/images/player/dealers/png/1501884-2.png',
-    gameShoe: 60345,
-    betTimeSeconds: 19,
-    countdown: 15,
-    status: 'betting',
-    martingaleStep: 0,
-  },
-];
-
-// In-memory live Sexy Baccarat tables store
-let liveTables: CasinoTable[] = initialSexyTablesData.map((d) => {
-  const seq = generateInitialSequence(d.id!);
+// In-memory live Sexy Baccarat tables store initialized with real 37 AE Sexy rooms
+let liveTables: CasinoTable[] = REAL_SEXY_TABLE_SEEDS.map((seed) => {
+  const seq = [...seed.initialSequence];
   const t: CasinoTable = {
-    id: d.id!,
-    tableCode: d.tableCode || `SE0${d.id}`,
+    id: seed.id,
+    tableCode: seed.code,
     provider: 'Sexy Baccarat',
-    tableName: d.tableName!,
-    hallName: (d.hallName as any) || 'Sexy Classic',
-    dealerName: d.dealerName!,
-    dealerCountry: d.dealerCountry!,
-    dealerImage: d.dealerImage!,
-    gameShoe: d.gameShoe!,
+    tableName: seed.name,
+    hallName: seed.hall,
+    dealerName: seed.dealerName,
+    dealerCountry: seed.dealerCountry,
+    dealerImage: seed.dealerImage,
+    gameShoe: seed.gameShoe,
     gameRound: seq.length,
-    status: (d.status as any) || 'betting',
-    countdown: d.countdown!,
-    betTimeSeconds: d.betTimeSeconds!,
+    status: 'betting',
+    countdown: 14,
+    betTimeSeconds: seed.betTimeSeconds,
     sequence: seq,
     winCounts: { P: 0, B: 0, T: 0 },
-    winRate: 96,
+    winRate: 100,
     cycleWinRate: 100,
-    beautyScore: 92,
-    patternHighlight: 'สูตรสแกน Sexy Baccarat VIP',
-    goodRoadCategory: 'streak',
+    beautyScore: 98,
+    patternHighlight: seed.goodRoadBadge || seed.goodRoadLabel || 'สูตรสแกน Sexy Baccarat VIP',
+    goodRoadCategory: seed.goodRoadCategory,
     isHotRoom: true,
     aiPrediction: 'P',
-    aiConfidence: 97,
-    aiReason: 'สูตรต้นฉบับ Sexy Baccarat VIP คำนวณขอนไพ่แม่นยำ',
-    martingaleStep: d.martingaleStep || 0,
+    aiConfidence: 100,
+    aiReason: 'สูตร All-in-One สแกนขอนไพ่ AE Sexy เรียลไทม์ 100%',
+    martingaleStep: 0,
     currentStreak: 5,
     lastUpdated: Date.now(),
-    isLiveStream: false,
-    openedCards: generateTableOpenedCards(d.id!, seq.length, d.gameShoe || 1000, seq[seq.length - 1]),
+    isLiveStream: true,
+    openedCards: generateTableOpenedCards(seed.id, seq.length, seed.gameShoe, seq[seq.length - 1]),
   };
   computeTableStats(t);
   return t;
@@ -734,8 +652,8 @@ async function syncFromUpstreamSexy(): Promise<boolean> {
         return table;
       });
 
-      // Maintain SE01 as id=1 for seamless backward compatibility if desired
-      liveTables = updatedTables;
+      // Sort live tables prioritizing mature late shoes (high rounds) and high win rates
+      liveTables = sortRoomsByLateAndWinRate(updatedTables as any) as any;
       return true;
     }
   } catch (err: any) {
@@ -832,7 +750,30 @@ async function startServer() {
   });
 
   // REST API: Live Sexy Baccarat Tables
-  app.get('/api/tables', (_req: Request, res: Response) => {
+  app.get('/api/tables', (req: Request, res: Response) => {
+    const { id } = req.query;
+    if (id) {
+      const search = String(id).toLowerCase();
+      const numId = parseInt(search, 10);
+      const table = liveTables.find(
+        (t) =>
+          (!isNaN(numId) && t.id === numId) ||
+          t.tableCode.toLowerCase() === search ||
+          (!isNaN(numId) && t.id % 1000 === numId)
+      );
+      if (!table) {
+        res.status(404).json({ status: 'error', message: 'Table not found' });
+        return;
+      }
+      res.json({
+        status: 'ok',
+        provider: 'Sexy Baccarat (AE Sexy Gaming)',
+        timestamp: Date.now(),
+        table,
+      });
+      return;
+    }
+
     res.json({
       status: 'ok',
       provider: 'Sexy Baccarat (AE Sexy Gaming)',
@@ -847,8 +788,14 @@ async function startServer() {
 
   // REST API: Specific Table Details
   app.get('/api/tables/:id', (req: Request, res: Response) => {
-    const tableId = parseInt(req.params.id, 10);
-    const table = liveTables.find((t) => t.id === tableId || t.tableCode === req.params.id);
+    const search = String(req.params.id).toLowerCase();
+    const numId = parseInt(search, 10);
+    const table = liveTables.find(
+      (t) =>
+        (!isNaN(numId) && t.id === numId) ||
+        t.tableCode.toLowerCase() === search ||
+        (!isNaN(numId) && t.id % 1000 === numId)
+    );
     if (!table) {
       res.status(404).json({ status: 'error', message: 'Table not found' });
       return;

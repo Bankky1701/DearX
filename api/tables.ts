@@ -1,29 +1,50 @@
-import { getClientFallbackSourceStatus, getClientFallbackTables, getClientFallbackTableById } from '../src/services/clientLiveEngine';
+import { fetchLiveSexyTables, getLiveTableById } from '../src/services/sexyLiveEngine';
 
-export default function handler(req: any, res: any) {
+export default async function handler(req: any, res: any) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept');
   res.setHeader('Content-Type', 'application/json');
 
   if (req.method === 'OPTIONS') {
     return res.status(200).end();
   }
 
-  const { id } = req.query || {};
+  try {
+    const { id } = req.query || {};
 
-  if (id) {
-    const tableId = parseInt(id as string, 10);
-    const table = getClientFallbackTableById(tableId);
+    if (id) {
+      const table = await getLiveTableById(id as string);
+      if (!table) {
+        return res.status(404).json({
+          status: 'error',
+          message: 'Table not found',
+        });
+      }
+      return res.status(200).json({
+        status: 'ok',
+        provider: 'Sexy Baccarat (AE Sexy Gaming)',
+        timestamp: Date.now(),
+        table,
+      });
+    }
+
+    const tables = await fetchLiveSexyTables();
     return res.status(200).json({
       status: 'ok',
-      table,
+      provider: 'Sexy Baccarat (AE Sexy Gaming)',
+      source: 'bpcdf.vctrf.com / AE Sexy Live',
+      cdn: 'jhmbs3.godbac987.com',
+      isLiveStream: true,
+      timestamp: Date.now(),
+      totalTables: tables.length,
+      tables,
+    });
+  } catch (err: any) {
+    console.error('Error in /api/tables handler:', err);
+    return res.status(500).json({
+      status: 'error',
+      message: err?.message || 'Internal server error',
     });
   }
-
-  const tables = getClientFallbackTables();
-  return res.status(200).json({
-    status: 'ok',
-    total: tables.length,
-    tables,
-  });
 }

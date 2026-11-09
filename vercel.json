@@ -1,0 +1,13 @@
+{
+  "framework": "vite",
+  "rewrites": [
+    {
+      "source": "/api/tables/:id",
+      "destination": "/api/tables?id=:id"
+    },
+    {
+      "source": "/api/sexy_rooms.php",
+      "destination": "/api/tables"
+    }
+  ]
+}

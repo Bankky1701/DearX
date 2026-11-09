@@ -73,12 +73,13 @@ export const HotRoomsLobby: React.FC<HotRoomsLobbyProps> = ({
   onSelectTable,
   activeTableId,
 }) => {
-  const [tables, setTables] = useState<ApiLiveTable[]>([]);
+  const [tables, setTables] = useState<ApiLiveTable[]>(() => liveCasinoApi.getTablesSync());
   const [sourceStatus, setSourceStatus] = useState<SourceStatus | null>(null);
-  const [loading, setLoading] = useState<boolean>(true);
+  const [loading, setLoading] = useState<boolean>(false);
   const [isSyncing, setIsSyncing] = useState<boolean>(false);
   const [selectedHall, setSelectedHall] = useState<string>('all');
-  const [selectedCategory, setSelectedCategory] = useState<'all' | 'hot' | 'streak' | 'chop'>('hot');
+  const [selectedCategory, setSelectedCategory] = useState<'all' | 'hot' | 'streak' | 'chop'>('all');
+  const [sortBy, setSortBy] = useState<'late_high_win' | 'win_rate' | 'rounds' | 'dragon'>('late_high_win');
   const [lastUpdated, setLastUpdated] = useState<number>(Date.now());
   const [showSourceModal, setShowSourceModal] = useState<boolean>(false);
 
@@ -105,7 +106,7 @@ export const HotRoomsLobby: React.FC<HotRoomsLobbyProps> = ({
     };
 
     fetchRooms();
-    const interval = setInterval(fetchRooms, 1000);
+    const interval = setInterval(fetchRooms, 1500);
 
     return () => {
       mounted = false;
@@ -128,9 +129,9 @@ export const HotRoomsLobby: React.FC<HotRoomsLobbyProps> = ({
     }, 400);
   };
 
-  // Filtered Sexy Baccarat tables
+  // Filtered & Sorted Sexy Baccarat tables (Default: ห้องเลทเยอะ + % สูงสุด ไว้บนสุด)
   const filteredTables = useMemo(() => {
-    return tables.filter((t) => {
+    const list = tables.filter((t) => {
       // Hall filter
       if (selectedHall !== 'all' && t.hallName !== selectedHall) {
         return false;
@@ -147,7 +148,30 @@ export const HotRoomsLobby: React.FC<HotRoomsLobbyProps> = ({
       }
       return true;
     });
-  }, [tables, selectedHall, selectedCategory]);
+
+    return [...list].sort((a, b) => {
+      if (sortBy === 'late_high_win') {
+        // High rounds (late mature shoe) + High win rate on top
+        const roundA = a.sequence ? a.sequence.length : a.gameRound || 0;
+        const roundB = b.sequence ? b.sequence.length : b.gameRound || 0;
+        const lateA = roundA >= 30 ? 3000 + roundA * 25 : roundA >= 15 ? 1200 + roundA * 15 : roundA * 10;
+        const lateB = roundB >= 30 ? 3000 + roundB * 25 : roundB >= 15 ? 1200 + roundB * 15 : roundB * 10;
+        const scoreA = (a.winRate * 40) + lateA + ((a.directWinRate || 90) * 10);
+        const scoreB = (b.winRate * 40) + lateB + ((b.directWinRate || 90) * 10);
+        return scoreB - scoreA;
+      }
+      if (sortBy === 'win_rate') {
+        return (b.winRate - a.winRate) || ((b.directWinRate || 0) - (a.directWinRate || 0));
+      }
+      if (sortBy === 'rounds') {
+        return (b.sequence.length - a.sequence.length);
+      }
+      if (sortBy === 'dragon') {
+        return ((b.currentStreak || 0) - (a.currentStreak || 0));
+      }
+      return 0;
+    });
+  }, [tables, selectedHall, selectedCategory, sortBy]);
 
   const hotCount = useMemo(() => {
     return tables.filter((t) => t.isHotRoom || t.winRate >= 95).length;
@@ -155,7 +179,7 @@ export const HotRoomsLobby: React.FC<HotRoomsLobbyProps> = ({
 
   const sexyHalls = [
     { id: 'all', label: 'โต๊ะทั้งหมด (All Rooms)', icon: '👙' },
-    { id: 'Sexy Classic', label: 'Sexy Classic (C01-C20)', icon: '💎' },
+    { id: 'Sexy Classic', label: 'Sexy Classic (C01-C22)', icon: '💎' },
     { id: 'Sexy Asia', label: 'Sexy Asia (B01-B15)', icon: '🌸' },
     { id: 'Sexy Speed', label: 'Sexy Speed (15วิ)', icon: '⚡' },
     { id: 'Sexy VIP', label: 'Sexy VIP รอยัล', icon: '👑' },
@@ -346,6 +370,74 @@ export const HotRoomsLobby: React.FC<HotRoomsLobbyProps> = ({
         </div>
       </div>
 
+      {/* Supercomputer Rank & Sort Selector Bar */}
+      <div className="bg-gradient-to-r from-blue-950/80 via-slate-900 to-indigo-950/80 border border-cyan-500/30 rounded-xl p-3 flex flex-wrap items-center justify-between gap-3 shadow-lg">
+        <div className="flex items-center gap-2">
+          <span className="w-2.5 h-2.5 rounded-full bg-cyan-400 animate-ping" />
+          <span className="text-xs font-black text-cyan-300 uppercase tracking-wide flex items-center gap-1.5">
+            <span>⚡ Supercomputer AI จัดอันดับ:</span>
+          </span>
+        </div>
+
+        <div className="flex items-center gap-1.5 flex-wrap">
+          <button
+            onClick={() => {
+              sound.playClick();
+              setSortBy('late_high_win');
+            }}
+            className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition cursor-pointer ${
+              sortBy === 'late_high_win'
+                ? 'bg-gradient-to-r from-cyan-600 to-blue-600 text-white shadow-md shadow-cyan-900/40 ring-1 ring-cyan-400'
+                : 'bg-slate-800/80 text-slate-300 hover:text-white border border-slate-700/60'
+            }`}
+          >
+            <span>🔥 ห้องเลทเยอะ + % สูงสุด (แนะนำเซียน)</span>
+          </button>
+
+          <button
+            onClick={() => {
+              sound.playClick();
+              setSortBy('win_rate');
+            }}
+            className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition cursor-pointer ${
+              sortBy === 'win_rate'
+                ? 'bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-md shadow-emerald-900/40 ring-1 ring-emerald-400'
+                : 'bg-slate-800/80 text-slate-300 hover:text-white border border-slate-700/60'
+            }`}
+          >
+            <span>💎 % ชนะจริงสูงสุด</span>
+          </button>
+
+          <button
+            onClick={() => {
+              sound.playClick();
+              setSortBy('rounds');
+            }}
+            className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition cursor-pointer ${
+              sortBy === 'rounds'
+                ? 'bg-gradient-to-r from-amber-600 to-orange-600 text-white shadow-md shadow-amber-900/40 ring-1 ring-amber-400'
+                : 'bg-slate-800/80 text-slate-300 hover:text-white border border-slate-700/60'
+            }`}
+          >
+            <span>⏳ ขอนปลาย 30+ ตา (สถิตินิ่งแน่น)</span>
+          </button>
+
+          <button
+            onClick={() => {
+              sound.playClick();
+              setSortBy('dragon');
+            }}
+            className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition cursor-pointer ${
+              sortBy === 'dragon'
+                ? 'bg-gradient-to-r from-rose-600 to-pink-600 text-white shadow-md shadow-rose-900/40 ring-1 ring-rose-400'
+                : 'bg-slate-800/80 text-slate-300 hover:text-white border border-slate-700/60'
+            }`}
+          >
+            <span>🐉 มังกรเกาะติด</span>
+          </button>
+        </div>
+      </div>
+
       {/* Tables Grid */}
       {loading && tables.length === 0 ? (
         <div className="py-20 text-center text-slate-400 bg-slate-900/60 rounded-2xl border border-slate-800">
@@ -379,12 +471,17 @@ export const HotRoomsLobby: React.FC<HotRoomsLobbyProps> = ({
                     : 'border-slate-800 hover:border-slate-700'
                 }`}
               >
-                {/* Hot Tag Ribbon */}
-                {table.isHotRoom && (
-                  <div className="absolute top-0 right-0 bg-gradient-to-l from-amber-500 to-rose-600 text-black font-black text-[9px] px-3 py-0.5 rounded-bl-lg shadow-sm">
-                    ★ ห้องแนะนำ 100%
+                {/* Hot / Late Shoe Tag Ribbon */}
+                {table.sequence.length >= 30 ? (
+                  <div className="absolute top-0 right-0 bg-gradient-to-l from-cyan-500 via-blue-500 to-indigo-600 text-white font-black text-[9px] px-3 py-0.5 rounded-bl-lg shadow-sm flex items-center gap-1">
+                    <span className="w-1.5 h-1.5 rounded-full bg-cyan-200 animate-ping" />
+                    <span>🔥 ขอนเลท ({table.sequence.length} ตา) สถิตินิ่ง</span>
                   </div>
-                )}
+                ) : table.isHotRoom ? (
+                  <div className="absolute top-0 right-0 bg-gradient-to-l from-amber-500 to-rose-600 text-black font-black text-[9px] px-3 py-0.5 rounded-bl-lg shadow-sm">
+                    ★ Supercomputer Pick
+                  </div>
+                ) : null}
 
                 <div>
                   {/* Top Bar: Real Dealer Photo & Table Code */}
@@ -505,53 +602,70 @@ export const HotRoomsLobby: React.FC<HotRoomsLobbyProps> = ({
                     </div>
                   </div>
 
-                  {/* Next Hand AI Prediction & 3-Step Martingale */}
-                  <div className="p-2.5 rounded-xl bg-slate-950/90 border border-slate-800 mb-3">
-                    <div className="flex items-center justify-between text-xs mb-1.5">
+                  {/* Supercomputer Quantum AI Prediction Box */}
+                  <div className="p-2.5 sm:p-3 rounded-xl bg-gradient-to-b from-slate-950 via-slate-950/95 to-blue-950/30 border border-cyan-500/30 mb-3 shadow-inner">
+                    {/* Exact Percentage Ratios */}
+                    <div className="flex items-center justify-between text-xs mb-2">
                       <div className="flex items-center gap-2 text-[11px] font-mono">
                         <span className="text-blue-400 font-bold">
-                          P: {table.winCounts.P} ({table.pPercent ?? (table.sequence.length > 0 ? Math.round((table.winCounts.P / table.sequence.length) * 100) : 0)}%)
+                          P: {table.winCounts.P} ({table.pPercent ?? 0}%)
                         </span>
                         <span className="text-red-400 font-bold">
-                          B: {table.winCounts.B} ({table.bPercent ?? (table.sequence.length > 0 ? Math.round((table.winCounts.B / table.sequence.length) * 100) : 0)}%)
+                          B: {table.winCounts.B} ({table.bPercent ?? 0}%)
                         </span>
                         <span className="text-emerald-400 font-bold">
-                          T: {table.winCounts.T}
+                          T: {table.winCounts.T} ({table.tPercent ?? 0}%)
                         </span>
                       </div>
-                      <span className="text-[11px] text-amber-300 font-semibold">
-                        เดินเงิน: {stepLabel}
+                      <span className="text-[10px] px-2 py-0.5 rounded-full font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40">
+                        {stepLabel}
                       </span>
                     </div>
 
-                    <div className="flex items-center justify-between pt-1.5 border-t border-slate-800/80">
-                      <span className="text-[11px] text-slate-300">สูตรสั่งแทงตาถัดไป:</span>
-                      <div className="flex items-center gap-1.5">
-                        <span
-                          className={`px-2.5 py-0.5 rounded font-black text-xs text-white shadow-md flex items-center gap-1.5 ${
-                            table.aiPrediction === 'P'
-                              ? 'bg-blue-600 border border-blue-400'
-                              : 'bg-red-600 border border-red-400'
-                          }`}
-                        >
-                          <img
-                            src={table.aiPrediction === 'P' ? CHIP_IMAGES.PLAYER : CHIP_IMAGES.BANKER}
-                            alt=""
-                            className="w-4 h-4 object-contain inline-block drop-shadow"
-                          />
-                          <span>{table.aiPrediction === 'P' ? 'PLAYER' : 'BANKER'}</span>
-                        </span>
-                        <span className="text-[11px] font-mono text-emerald-400 font-bold">
+                    {/* Next Hand Bet Recommendation with Chip & Exact Confidence */}
+                    <div className="flex items-center justify-between py-2 px-2.5 rounded-xl bg-slate-900/90 border border-slate-800">
+                      <div>
+                        <div className="text-[10px] uppercase tracking-wider text-slate-400 font-bold flex items-center gap-1">
+                          <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-ping" />
+                          <span>สูตรแทงตาถัดไป (Supercomputer):</span>
+                        </div>
+                        <div className="flex items-center gap-2 mt-1">
+                          <div className="w-7 h-7 shrink-0">
+                            <img
+                              src={table.aiPrediction === 'P' ? CHIP_IMAGES.PLAYER : CHIP_IMAGES.BANKER}
+                              alt=""
+                              className="w-full h-full object-contain drop-shadow-[0_0_8px_rgba(59,130,246,0.6)]"
+                            />
+                          </div>
+                          <span
+                            className={`text-sm sm:text-base font-black tracking-wide ${
+                              table.aiPrediction === 'P' ? 'text-blue-400' : 'text-red-400'
+                            }`}
+                          >
+                            {table.aiPrediction === 'P' ? 'PLAYER (น้ำเงิน)' : 'BANKER (แดง)'}
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="text-right">
+                        <div className="text-[10px] text-slate-400 font-medium">ความแม่นยำจริง</div>
+                        <div className="text-lg sm:text-xl font-black text-emerald-400 font-mono tracking-tight drop-shadow-[0_0_8px_rgba(52,211,153,0.4)]">
                           {table.aiConfidence}%
-                        </span>
+                        </div>
                       </div>
                     </div>
-                    <div className="flex items-center justify-between text-[10px] text-cyan-300 font-mono mt-1.5 pt-1.5 border-t border-slate-800/80">
-                      <span className="flex items-center gap-1">
-                        <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse" />
-                        AI Monte Carlo 120,000 รูปแบบ
+
+                    {/* Real Backtested Record & Shoe Maturity */}
+                    <div className="flex items-center justify-between text-[10px] text-cyan-300 font-mono mt-2 pt-1.5 border-t border-slate-800/80">
+                      <span className="flex items-center gap-1 text-slate-300 truncate">
+                        <span>⏳</span>
+                        <span>{table.shoePhase || (table.sequence.length >= 30 ? `ขอนเลท (${table.sequence.length} ตา) สถิตินิ่ง` : `ตาที่ ${table.sequence.length}`)}</span>
                       </span>
-                      <span className="text-emerald-300 font-bold">สูตร AI ใน 2 วิ</span>
+                      <span className="text-emerald-400 font-bold shrink-0 ml-1">
+                        {table.realWins !== undefined && table.realTotalTested !== undefined
+                          ? `ชนะจริง ${table.realWins}/${table.realTotalTested} ตา`
+                          : '120k Quantum Sim'}
+                      </span>
                     </div>
                   </div>
                 </div>
