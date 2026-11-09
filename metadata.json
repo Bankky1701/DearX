@@ -1,0 +1,7 @@
+{
+  "name": "Bacarrathack - สูตรบาคาร่า SA Game",
+  "description": "เว็บสูตรบาคาร่า AI คำนวณอัตราการชนะ แจกสูตรฟรี วิเคราะห์เค้าไพ่แบบเรียลไทม์ พร้อมระบบจัดการหลังบ้าน",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
+
