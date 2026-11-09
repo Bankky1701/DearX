@@ -90,26 +90,26 @@ export const SexyGoodRoomsModal: React.FC<SexyGoodRoomsModalProps> = ({
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<'hot' | 'streak' | 'chop' | 'all'>('hot');
 
-  const loadRooms = async (force = false) => {
-    setLoading(true);
+  const loadRooms = async (force = false, showLoader = false) => {
+    if (showLoader) setLoading(true);
     try {
       const res = await fetchLiveSexyRooms(force);
       if (res.status === 'ok') {
-        setRooms(res.rooms);
+        setRooms([...res.rooms]);
       }
     } finally {
-      setLoading(false);
+      if (showLoader) setLoading(false);
     }
   };
 
   useEffect(() => {
     if (!isOpen) return;
-    loadRooms(false);
+    loadRooms(false, true);
 
-    // Auto refresh every 8s as in original bundle
+    // Auto refresh every 1.0s for real-time live clock & sequences
     const interval = setInterval(() => {
-      loadRooms(false);
-    }, 8000);
+      loadRooms(false, false);
+    }, 1000);
 
     return () => clearInterval(interval);
   }, [isOpen]);

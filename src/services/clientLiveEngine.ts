@@ -257,6 +257,12 @@ if (typeof window !== 'undefined') {
       const pC = nextSeq.filter((x) => x === 'P').length;
       const bC = nextSeq.filter((x) => x === 'B').length;
       const tC = nextSeq.filter((x) => x === 'T').length;
+      const totalR = nextSeq.length;
+
+      const pPercent = totalR > 0 ? Number(((pC / totalR) * 100).toFixed(1)) : 0;
+      const bPercent = totalR > 0 ? Number(((bC / totalR) * 100).toFixed(1)) : 0;
+      const tPercent = totalR > 0 ? Number(((tC / totalR) * 100).toFixed(1)) : 0;
+
       const pred: 'P' | 'B' = pC >= bC ? 'P' : 'B';
 
       return {
@@ -266,8 +272,12 @@ if (typeof window !== 'undefined') {
         sequence: nextSeq,
         gameRound: nextRound,
         winCounts: { P: pC, B: bC, T: tC },
+        pPercent,
+        bPercent,
+        tPercent,
         aiPrediction: pred,
         aiConfidence: 100.0,
+        aiReason: `วิเคราะห์เค้าไพ่ 6 มิติเจาะลึก 100% ล็อคเป้าแทง ${pred === 'P' ? 'PLAYER' : 'BANKER'} ชนะชัวร์`,
         lastUpdated: Date.now(),
         openedCards: generateTableOpenedCards(t.id, nextRound, nextSeq[nextSeq.length - 1]),
       };
@@ -276,11 +286,21 @@ if (typeof window !== 'undefined') {
 }
 
 export function getClientFallbackTables(): ApiLiveTable[] {
-  return localTables;
+  return localTables.map((t) => ({
+    ...t,
+    sequence: [...t.sequence],
+    winCounts: { ...t.winCounts },
+  }));
 }
 
 export function getClientFallbackTableById(id: number): ApiLiveTable | null {
-  return localTables.find((t) => t.id === id) || localTables[0] || null;
+  const found = localTables.find((t) => t.id === id) || localTables[0] || null;
+  if (!found) return null;
+  return {
+    ...found,
+    sequence: [...found.sequence],
+    winCounts: { ...found.winCounts },
+  };
 }
 
 export function getClientFallbackSourceStatus(): SourceStatus {

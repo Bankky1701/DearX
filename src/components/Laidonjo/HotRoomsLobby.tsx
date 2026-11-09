@@ -94,7 +94,7 @@ export const HotRoomsLobby: React.FC<HotRoomsLobbyProps> = ({
 
       if (mounted) {
         if (tableList.length > 0) {
-          setTables(tableList);
+          setTables([...tableList]);
           setLoading(false);
           setLastUpdated(Date.now());
         }
@@ -105,7 +105,7 @@ export const HotRoomsLobby: React.FC<HotRoomsLobbyProps> = ({
     };
 
     fetchRooms();
-    const interval = setInterval(fetchRooms, 1800);
+    const interval = setInterval(fetchRooms, 1000);
 
     return () => {
       mounted = false;
