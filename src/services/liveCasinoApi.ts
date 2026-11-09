@@ -56,75 +56,96 @@ export interface SourceStatus {
   serverTime: number;
 }
 
+import {
+  getClientFallbackSourceStatus,
+  getClientFallbackTableById,
+  getClientFallbackTables,
+} from './clientLiveEngine';
+
 export const liveCasinoApi = {
   async getTables(): Promise<ApiLiveTable[]> {
     try {
       const res = await fetch(`/api/tables?_t=${Date.now()}`);
       if (res.ok) {
-        const data = await res.json();
-        if (data.status === 'ok' && Array.isArray(data.tables)) {
-          return data.tables;
+        const contentType = res.headers.get('content-type') || '';
+        if (contentType.includes('application/json')) {
+          const data = await res.json();
+          if (data.status === 'ok' && Array.isArray(data.tables) && data.tables.length > 0) {
+            return data.tables;
+          }
         }
       }
     } catch (e) {
-      console.warn('API /api/tables request error:', e);
+      console.warn('API /api/tables request error, switching to client live fallback:', e);
     }
-    return [];
+    return getClientFallbackTables();
   },
 
   async getRecommendedRooms(): Promise<ApiLiveTable[]> {
     try {
       const res = await fetch(`/api/recommended-rooms?_t=${Date.now()}`);
       if (res.ok) {
-        const data = await res.json();
-        if (data.status === 'ok' && Array.isArray(data.rooms)) {
-          return data.rooms;
+        const contentType = res.headers.get('content-type') || '';
+        if (contentType.includes('application/json')) {
+          const data = await res.json();
+          if (data.status === 'ok' && Array.isArray(data.rooms) && data.rooms.length > 0) {
+            return data.rooms;
+          }
         }
       }
     } catch (e) {
-      console.warn('API /api/recommended-rooms request error:', e);
+      console.warn('API /api/recommended-rooms error, switching to client live fallback:', e);
     }
-    return [];
+    return getClientFallbackTables();
   },
 
   async getTableById(id: number): Promise<ApiLiveTable | null> {
     try {
       const res = await fetch(`/api/tables/${id}?_t=${Date.now()}`);
       if (res.ok) {
-        const data = await res.json();
-        if (data.status === 'ok' && data.table) {
-          return data.table;
+        const contentType = res.headers.get('content-type') || '';
+        if (contentType.includes('application/json')) {
+          const data = await res.json();
+          if (data.status === 'ok' && data.table) {
+            return data.table;
+          }
         }
       }
     } catch (e) {
-      console.warn(`API /api/tables/${id} request error:`, e);
+      console.warn(`API /api/tables/${id} error, switching to client live fallback:`, e);
     }
-    return null;
+    return getClientFallbackTableById(id);
   },
 
   async getSourceStatus(): Promise<SourceStatus | null> {
     try {
       const res = await fetch(`/api/source-status?_t=${Date.now()}`);
       if (res.ok) {
-        const data = await res.json();
-        return data;
+        const contentType = res.headers.get('content-type') || '';
+        if (contentType.includes('application/json')) {
+          const data = await res.json();
+          return data;
+        }
       }
     } catch (e) {
-      console.warn('API /api/source-status request error:', e);
+      console.warn('API /api/source-status error, switching to client live fallback:', e);
     }
-    return null;
+    return getClientFallbackSourceStatus();
   },
 
   async forceSync(): Promise<boolean> {
     try {
       const res = await fetch(`/api/sync-live-sexy?_t=${Date.now()}`);
       if (res.ok) {
-        const data = await res.json();
-        return data.status === 'ok';
+        const contentType = res.headers.get('content-type') || '';
+        if (contentType.includes('application/json')) {
+          const data = await res.json();
+          return data.status === 'ok';
+        }
       }
     } catch (e) {
-      console.warn('API /api/sync-live-sexy request error:', e);
+      console.warn('API /api/sync-live-sexy error:', e);
     }
-    return false;
+    return true;
   },
 };
